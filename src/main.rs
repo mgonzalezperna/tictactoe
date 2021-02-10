@@ -1,38 +1,9 @@
 use std::fmt;
 use std::io;
-use std::io::Error as ioError;
-use std::num::ParseIntError;
 
 const ROWS: usize = 3;
 const COLS: usize = 3;
 
-// Custom error struct
-#[derive(Debug)]
-struct Error {
-    description: String,
-}
-
-impl Error {
-    fn new(err_description: String) -> Error {
-        Error {
-            description: err_description,
-        }
-    }
-}
-
-impl From<ParseIntError> for Error {
-    fn from(e: ParseIntError) -> Self {
-        Error::new(format!("ParseIntError: {}", e))
-    }
-}
-
-impl From<ioError> for Error {
-    fn from(e: ioError) -> Self {
-        Error::new(format!("Input error: {}", e))
-    }
-}
-
-// State struct
 #[derive(Debug, Copy, Clone)]
 enum State {
     Empty,
@@ -61,7 +32,7 @@ impl PartialEq for State {
     }
 }
 
-// Coordinates struct
+// Coordinates
 #[derive(Copy, Clone, Debug)]
 struct Coordinate {
     x: u8,
@@ -80,7 +51,7 @@ impl PartialEq for Coordinate {
     }
 }
 
-// Cell struct
+// Cell
 #[derive(Copy, Clone, Debug)]
 struct Cell {
     state: State,
@@ -96,127 +67,75 @@ impl Cell {
     }
 }
 
-// Fuctions
+//Fuctions
 
 fn show_grid(grid: &Vec<Cell>) {
     for (i, cell) in grid.iter().enumerate() {
-        match (i + 1) % COLS {
+        match (i + 1) % 3 {
             0 => println!("|{}|", cell.state),
             _ => print!("|{}", cell.state),
         }
     }
 }
 
-fn exist_winning_move(initial_cell: Cell, middle: &Cell, extreme: &Cell) -> bool {
-    use State::*;
-    match (initial_cell.state, middle.state, extreme.state) {
-        (X, X, X) | (O, O, O) => {
-            return true;
-        }
-        (_, _, _) => return false,
-    };
-}
-
 fn is_gameover(grid: Vec<Cell>) -> bool {
-    let grid_iterator = grid.iter();
-
-    for cell in grid.clone() {
-        let mut relative_cells_to_eval: Vec<(&Cell, &Cell)> = vec![];
-        let middle_row = grid_iterator.clone().find(|&other_cell| {
-            other_cell.address.x == cell.address.x + 1 && other_cell.address.y == cell.address.y
-        });
-        let extreme_row = grid_iterator.clone().find(|&other_cell| {
-            other_cell.address.x == cell.address.x + 2 && other_cell.address.y == cell.address.y
-        });
-        match (middle_row, extreme_row) {
-            (Some(middle), Some(extreme)) => relative_cells_to_eval.push((middle, extreme)),
-            (_, _) => {}
-        }
-
-        let middle_diagonal_lr = grid_iterator.clone().find(|&other_cell| {
-            other_cell.address.x == cell.address.x + 1 && other_cell.address.y == cell.address.y + 1
-        });
-        let extreme_diagonal_lr = grid_iterator.clone().find(|&other_cell| {
-            other_cell.address.x == cell.address.x + 2 && other_cell.address.y == cell.address.y + 2
-        });
-        match (middle_diagonal_lr, extreme_diagonal_lr) {
-            (Some(middle), Some(extreme)) => relative_cells_to_eval.push((middle, extreme)),
-            (_, _) => {}
-        }
-
-        if cell.address.x >= 3 {
-            //Because tictactoe needs at least 3 cells lined, to check diagonal from right to left we need to ensure that at least we are in col 3.
-            let middle_diagonal_rl = grid_iterator.clone().find(|&other_cell| {
-                other_cell.address.x == cell.address.x - 1
-                    && other_cell.address.y == cell.address.y + 1
-            });
-            let extreme_diagonal_rl = grid_iterator.clone().find(|&other_cell| {
-                other_cell.address.x == cell.address.x - 2
-                    && other_cell.address.y == cell.address.y + 2
-            });
-            match (middle_diagonal_rl, extreme_diagonal_rl) {
-                (Some(middle), Some(extreme)) => relative_cells_to_eval.push((middle, extreme)),
-                (_, _) => {}
+    // bruh.jpeg
+    // check rows and columns
+    for i in 0..2 {
+        let row = 3 * i;
+        if (
+            // rows
+            grid[0 + row].state == grid[1 + row].state
+        ) && (grid[0 + row].state == grid[2 + row].state)
+        {
+            match grid[0 + row].state {
+                State::Empty => continue,
+                _ => return true,
             }
         }
-
-        let middle_vertical = grid_iterator.clone().find(|&other_cell| {
-            other_cell.address.x == cell.address.x && other_cell.address.y == cell.address.y + 1
-        });
-        let extreme_vertical = grid_iterator.clone().find(|&other_cell| {
-            other_cell.address.x == cell.address.x && other_cell.address.y == cell.address.y + 2
-        });
-        match (middle_vertical, extreme_vertical) {
-            (Some(middle), Some(extreme)) => relative_cells_to_eval.push((middle, extreme)),
-            (_, _) => {}
-        }
-
-        for (middle, extreme) in relative_cells_to_eval {
-            if exist_winning_move(cell, middle, extreme) {
-                return true;
-            };
+        if (
+            // columns
+            grid[0 + i].state == grid[3 + i].state
+        ) && (grid[0 + i].state == grid[6 + i].state)
+        {
+            match grid[0 + i].state {
+                State::Empty => continue,
+                _ => return true,
+            }
         }
     }
-    // Check draw
+    // check draw
     for cell in grid {
         match cell.state {
             State::Empty => return false,
-            _ => {}
+            _ => break,
         }
     }
-    true
+    false
 }
 
-fn get_player_input(axis: String) -> Result<u8, Error> {
-    println!("Please, enter {} coordinate", axis);
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    let value: u8 = match input.trim().parse() {
-        Ok(0) | Err(_) => {
-            println!("The input for coordinates are invalid, please, ingress a valid value");
-            return get_player_input(axis);
-        }
-        Ok(number) => number,
-    };
-    Ok(value)
-}
-
-fn get_player_choice() -> Result<Coordinate, Error> {
-    let x = get_player_input("x".into())?;
-    let y = get_player_input("y".into())?;
+fn get_player_choose() -> Coordinate {
+    let mut x = String::new();
+    let mut y = String::new();
+    println!("Please, enter x coordinate");
+    io::stdin().read_line(&mut x).expect("Failed to read line");
+    println!("Please, enter y coordinate");
+    io::stdin().read_line(&mut y).expect("Failed to read line");
+    let x: u8 = x.trim().parse().expect("Please type a number!");
+    let y: u8 = y.trim().parse().expect("Please type a number!");
     let coordinate = Coordinate::new(x - 1, y - 1);
-    Ok(coordinate)
+    return coordinate;
 }
 
-fn change_turn(turn_owner: State) -> Result<State, Error> {
+fn change_turn(turn_owner: State) -> State {
     match turn_owner {
-        State::X => Ok(State::O),
-        State::O => Ok(State::X),
-        _ => Err(Error::new("Can't change turns".to_string())),
+        State::X => return State::O,
+        State::O => return State::X,
+        _ => panic!("Can't change turns".to_string()),
     }
 }
 
-fn main() -> Result<(), Error> {
+fn main() {
     let mut grid: Vec<Cell> = vec![];
 
     for y in 0..ROWS {
@@ -227,7 +146,7 @@ fn main() -> Result<(), Error> {
     let mut turn_owner = State::X;
     show_grid(&grid);
     while !is_gameover(grid.clone()) {
-        let coordinate = get_player_choice()?;
+        let coordinate = get_player_choose();
         let grid_position = grid
             .iter()
             .position(|&cell| cell.address == coordinate && cell.state == State::Empty);
@@ -236,15 +155,14 @@ fn main() -> Result<(), Error> {
                 if grid[index].state == State::Empty && turn_owner != State::Empty {
                     grid[index].state = turn_owner
                 }
-                turn_owner = change_turn(turn_owner)?;
+                turn_owner = change_turn(turn_owner);
             }
             None => println!(
-                "{},{} is not a valid coordinate for this grid.",
+                "{},{} is not a valid coordinate",
                 coordinate.x + 1,
                 coordinate.y + 1
             ),
         }
         show_grid(&grid);
     }
-    Ok(())
 }
